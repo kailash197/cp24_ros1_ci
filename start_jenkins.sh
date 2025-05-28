@@ -17,6 +17,7 @@ if ! systemctl is-active --quiet docker; then
     echo "[+] Enabling and starting Docker service..."
     sudo systemctl enable docker
     sudo systemctl start docker
+    sudo usermod -aG docker $USER
 else
     echo "[✓] Docker service is already running."
 fi
@@ -94,3 +95,5 @@ else
     echo $URL >> $STATE_FILE
     echo "3. See '$STATE_FILE' for Jenkins PID and URL."
 fi
+
+ssh-keyscan github.com >> ~/.ssh/known_hosts
