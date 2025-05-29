@@ -18,24 +18,41 @@ pipeline {
         stage('CHECK DOCKER CONTAINER') {
             steps {
                 sh 'sudo docker-compose ps'
+                echo 'Waiting for Gazebo to spin up...'
+                sleep time: 10, unit: 'SECONDS'
             }
         }
 
-        stage('TEST ROS WAYPOINTS INSIDE DOCKER CONTAINER') {
+        stage('TEST1: PASSING TESTS') {
             steps {
-                sh '''
-                    sudo docker-compose exec -T roscore_gazebo bash -c \
-                        "
-                            source /opt/ros/noetic/setup.bash \\
-                            source ~/simulation_ws/devel/setup.bash \\
-                            rostest tortoisebot_waypoints waypoints_test.test --reuse-master \\
-                        "
+                script {
+                    def testCommand = '''
+                        sudo docker-compose exec -T roscore_gazebo bash -c '
+                            set -e
+                            source /opt/ros/noetic/setup.bash &&
+                            source ~/simulation_ws/devel/setup.bash &&
+                            rostest tortoisebot_waypoints waypoints_test.test --reuse-master
+                        '
                     '''
-                // sh 'sudo docker-compose exec roscore_gazebo -c \
-                //     "source /opt/ros/noetic/setup.bash \
-                //     cd ~/simulation_ws && catkin_make --pkg tortoisebot_waypoints && source devel/setup.bash \
-                //     rostest tortoisebot_waypoints waypoints_test.test --reuse-master"'
-                sleep 15
+
+                    // Run the command and capture both stdout and stderr
+                    def testOutput = sh(script: "${testCommand}", returnStdout: true)
+
+                    echo "===== TEST OUTPUT ====="
+                    echo testOutput
+
+                    writeFile file: 'passingtest_output.txt', text: testOutput
+                    archiveArtifacts artifacts: 'passingtest_output.txt'
+                }
+            }
+            post {
+                always {
+                    sh '''
+                        if [ ! -s passingtest_output.txt ]; then
+                            echo "⚠️ Warning: passingtest_output.txt is empty."
+                        fi
+                    '''
+                }
             }
         }
 
@@ -44,13 +61,11 @@ pipeline {
                 sh 'sudo docker-compose down'
             }
         }
-
-        stage('Done') {
-            steps {
-                sleep 3
-                echo 'Pipeline completed'
-            }
+    }
+    post {
+        always {
+            echo 'Pipeline completed'
+            // Optional: Send test results via email or other notification
         }
     }
 }
-  
